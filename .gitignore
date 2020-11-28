@@ -1,0 +1,11 @@
+.ipynb_checkpoints/
+__pycache__/
+trained_params/
+results/
+ppo_tf_dev.ipynb
+common/__pycache__/
+GitHub/
+保管庫/
+play_imgs/
+frames/
+旧PPO.txt
