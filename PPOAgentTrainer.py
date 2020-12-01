@@ -28,7 +28,7 @@ class PPOAgentTrainer():
         self._calc_stdev = PPOAgentTrainer.Calculater_Statistics.createInstance()
         
     def train(self, epochs, trajectory_size=1024, lamda_GAE=0.95, gamma=0.99, batch_size=1024, clip_range=0.2, 
-              standardize_rewards_per_epoch=False, verbose_interval=1):
+              verbose_interval=1):
         
         start_time = datetime.now()
         
@@ -109,12 +109,6 @@ class PPOAgentTrainer():
             trajectory["next_state"] = np.array(trajectory["next_state"], dtype=np.float32).reshape(-1, self._state_dim)
             trajectory["done"] = np.array(trajectory["done"], dtype=np.float32).reshape(-1, 1)
             trajectory["policy"] = np.array(trajectory["policy"], dtype=np.float32).reshape(-1, self._action_dim)
-            
-            #報酬をエポックごとに標準化する場合
-            if standardize_rewards_per_epoch==True:
-                #平均を0にしない標準化
-                rewards_std = standardize(trajectory["reward_raw"], with_mean=False).reshape(-1, 1)
-                trajectory["reward"] = rewards_std
             
             ##GAEの算出##
 
@@ -215,7 +209,6 @@ class PPOAgentTrainer():
         result["gamma"] = gamma
         result["batch_size"] = batch_size
         result["clip_range"] = clip_range
-        result["standardize_rewards_per_epoch"] = standardize_rewards_per_epoch
         
         return result
 
