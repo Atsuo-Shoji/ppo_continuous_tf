@@ -30,6 +30,14 @@ class PPOAgentTrainer():
     def train(self, epochs, trajectory_size=1024, lamda_GAE=0.95, gamma=0.99, batch_size=1024, clip_range=0.2, 
               verbose_interval=1):
         
+        #epochs：何エポック訓練するか
+        #trajectory_size：経験データのサイズ
+        #lamda_GAE：GAE算出の際に使用するλ
+        #gamma：報酬の割引率γ
+        #batch_size：1イテレーションのミニバッチサイズ
+        #clip_range：ratio算出の際に使用するclipの範囲のε
+        #verbose_interval：何エポック毎に訓練記録をprint出力するか
+        
         start_time = datetime.now()
         
         #訓練結果の記録　エポック毎の記録
@@ -194,14 +202,14 @@ class PPOAgentTrainer():
             print("総処理時間：", processing_time_total_string)
             
         result = {}
-        result["name"] = self._name
-        result["loss_actor_epochs"] = loss_actor_epochs
-        result["loss_critic_epochs"] = loss_critic_epochs
-        result["steps_epochs"] = steps_epochs
-        result["score_epochs"] = score_epochs
-        result["best_score"] = best_score
-        result["processing_time_total_string"] = processing_time_total_string
-        result["processing_time_total"] = processing_time_total
+        result["name"] = self._name #このインスタンスの名前
+        result["loss_actor_epochs"] = loss_actor_epochs #各エポックでのActorのlossのList。Listの1要素はエポック。
+        result["loss_critic_epochs"] = loss_critic_epochs #各エポックでのCriticのlossのList。Listの1要素はエポック。
+        result["steps_epochs"] = steps_epochs #各エポックでの1エピソード試行でのステップ数のList。Listの1要素はエポック。
+        result["score_epochs"] = score_epochs #各エポックでの1エピソード試行での稼得ScoreのList。Listの1要素はエポック。
+        result["best_score"] = best_score #全エポックでのエピソード試行でのBest Score。
+        result["processing_time_total_string"] = processing_time_total_string #総処理時間の文字列表現。
+        result["processing_time_total"] = processing_time_total #総処理時間。
         #以下引数
         result["epochs"] = epochs
         result["trajectory_size"] = trajectory_size

@@ -1,9 +1,9 @@
-# PPO（Proximal Policy Optimization）（TensorFlow2を使用）
+# PPO（Proximal Policy Optimization）（TensorFlow2.3.0を使用）
 
 
 ## 概要
 
-PPO（Proximal Policy Optimization）をTensorflow2で実装しました。<br>
+PPO（Proximal Policy Optimization）をTensorflow2.3.0で実装しました。<br>
 **PPOでは普通に行われる並列化Agentによる経験データ（Trajectory）収集は行っていません。Agentは単体です。**<BR>
     
 本モデルは、行動が連続値を取る環境を対象としています。<BR>
@@ -180,6 +180,9 @@ Agentが一体しかない場合は、経験データの”質”が訓練成果
 
 ## 物理構成
 
+※TensorFlowは2.3.0以上が必要です。tensorflow_probabilityを使用しています。
+
+training.ipynb　・・・実際にモデルの訓練を実行できるノートブック<BR>
 PPOAgentTrainer.py　・・・Trainer<BR>
 Agent.py　・・・Agent<BR>
 common/<br>
