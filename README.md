@@ -176,5 +176,20 @@ Agentが一体しかない場合は、経験データの”質”が訓練成果
 **経験データ（Trajectory）を収集し、それを使用してNNの最適化を行う、という手法を取る場合は、並列化Agentによる経験データ収集が必要**<br>
 ということだと思います。<br>
 
+<br><br>
+
+## 物理構成
+
+PPOAgentTrainer.py　・・・Trainer<BR>
+Agent.py　・・・Agent<BR>
+common/<br>
+&nbsp;└funcs.py　・・・ユーティリティ関数など<br>
+&nbsp;└env_wrappers.py　・・・gym.Wrapperの各種サブクラス<br>
+<br>
+
+![物理構成_70](https://user-images.githubusercontent.com/52105933/100743622-e2490980-341f-11eb-98ce-c7c10d18d438.png)
+
+<br><br><br>
+
 
 ※本リポジトリに公開しているプログラムやデータ、リンク先の情報の利用によって生じたいかなる損害の責任も負いません。これらの利用は、利用者の責任において行ってください。
