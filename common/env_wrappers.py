@@ -139,3 +139,32 @@ class EnvWrapper_03(gym.Wrapper):
             rew_ = rew
             
         return obs, rew_, done, info
+    
+class EnvWrapper_04(gym.Wrapper):
+    """
+    単純に報酬をx倍して返す
+    """
+    def __init__(self, env, reward_scale=0.1):
+        
+        super(EnvWrapper_04, self).__init__(env)
+        
+        self.env = env        
+        self._reward_scale = reward_scale
+        
+        self.steps = 0        
+
+    def reset(self):
+        
+        obs = self.env.reset()
+        self.steps = 0
+        
+        return obs
+
+    def step(self, action):
+        
+        self.steps += 1
+        obs, rew, done, info = self.env.step(action)
+        
+        rew_ = rew * self._reward_scale
+            
+        return obs, rew_, done, info

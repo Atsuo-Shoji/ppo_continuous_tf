@@ -248,18 +248,46 @@ class Agent():
             #Actorの訓練関数
             #引数の訓練データはミニバッチ
             #tf仕様上は必須ではないが、引数の訓練データはtensorにして呼ぶこと
+            
+            #print("states.shape:", states.shape) #(batch_size, state_dim)
+            #print("actions.shape:", actions.shape) #(batch_size, action_dim)
+            #print("gaes.shape:", gaes.shape) #(batch_size, 1)
+            #print("base_policies.shape:", base_policies.shape) #(batch_size, action_dim)
 
             with tf.GradientTape() as tape:
 
-                curr_mus, curr_sigmas = self(states)                
-                pdfs_normal = tfd.Normal(loc=curr_mus, scale=curr_sigmas)                
-                curr_policies = pdfs_normal.prob(actions)                
-                ratios = curr_policies / (base_policies + 1e-8)                
-                ratios_clipped = tf.clip_by_value(ratios, 1-clip_range, 1+clip_range)                
-                losses_unclipped = ratios * gaes                
-                losses_clipped = ratios_clipped * gaes                
-                losses = tf.minimum(losses_unclipped, losses_clipped)                
-                loss = -1 * tf.reduce_mean(losses)
+                curr_mus, curr_sigmas = self(states)
+                #(batch_size, action_dim)
+                #(batch_size, action_dim)
+
+                pdfs_normal = tfd.Normal(loc=curr_mus, scale=curr_sigmas)
+                
+                curr_policies = pdfs_normal.prob(actions)
+                #(batch_size, action_dim)
+
+                ratios = curr_policies / (base_policies + 1e-8)
+                #(batch_size, action_dim)
+                
+                ratios_clipped = tf.clip_by_value(ratios, 1-clip_range, 1+clip_range)
+                #(batch_size, action_dim)
+
+                losses_unclipped = ratios * gaes
+                #(batch_size, action_dim)
+
+                losses_clipped = ratios_clipped * gaes
+                #(batch_size, action_dim)
+
+                losses = tf.minimum(losses_unclipped, losses_clipped)
+                #(batch_size, action_dim)
+                
+                #以下のエントロピー補正はむしろ悪化したので無効に
+                
+                #entropy = tf.reduce_sum( curr_policies * tf.math.log(curr_policies + 1e-8), axis=1 )
+                #shapeは(batch_size, )のはず
+                
+                #l_entropy = tf.reduce_mean(entropy)
+                
+                loss = -1 * tf.reduce_mean(losses) #- 0.01 * l_entropy
 
             grads = tape.gradient(loss, self.trainable_variables)
             
