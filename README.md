@@ -97,9 +97,9 @@ ActorのLossをclipするのに使用されるratioは、以下のように算�
 
 |項目|値など|
 |      :---:     |      :---:      | 
-|経験データサイズ|6144|
+|経験データサイズ|8192|
 |バッチサイズ|2048|
-|イテレーション回数/エポック|3|
+|イテレーション回数/エポック|4|
 |Clip Rangeのε|0.2|
 |GAE算出でのλ|0.95|
 |GAE算出での報酬の割引率γ|0.99|
@@ -107,10 +107,10 @@ ActorのLossをclipするのに使用されるratioは、以下のように算�
 #### ScoreとLoss
 
 ＜Score＞<br>
-![MountainCarContinuous_score](https://user-images.githubusercontent.com/52105933/100699775-367fc980-33df-11eb-89ef-30cf02eb9198.png)
+![MountainCarContinuous_score_2](https://user-images.githubusercontent.com/52105933/100830179-6fcf3c80-34a6-11eb-9d6b-357abd714a47.png)
 
 ＜Loss＞<br>
-![MountainCarContinuous_loss](https://user-images.githubusercontent.com/52105933/100699845-662ed180-33df-11eb-8418-5358c1b1d22b.png)
+![MountainCarContinuous_loss_2](https://user-images.githubusercontent.com/52105933/100830240-87a6c080-34a6-11eb-86f3-00ab2f0f85ff.png)
 
 #### 考察
 

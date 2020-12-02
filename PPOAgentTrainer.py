@@ -12,7 +12,7 @@ from common.funcs import *
 
 class PPOAgentTrainer():
     
-    def __init__(self, name, env, agent):
+    def __init__(self, name, env, agent, description=""):
         
         self._name = name
         self._env = env
@@ -20,6 +20,8 @@ class PPOAgentTrainer():
 
         self._state_dim = self._agent.state_dim
         self._action_dim = self._agent.action_dim
+        
+        self._description = description
         
         #報酬の蓄積
         #Reward Scalingのための全報酬の標準偏差の算出に使用
@@ -120,7 +122,9 @@ class PPOAgentTrainer():
             
             ##GAEの算出##
 
-            #Reward Scalingのための蓄積報酬の標準偏差算出
+            #即時報酬の標準化（Reward Scaling）のために、訓練当初より蓄積された即時報酬の標準偏差を求める。
+            #後のGAE算出時、訓練当初より蓄積された即時報酬の標準偏差で各即時報酬を割る。
+            #ただし平均は引かない。
             #sigma_reward_accumulated = np.std(reward_accumulated_arr)
             #↓squeeze()は、この時点でのshape(trajectory_size, 1)⇒(trajectory_size,)にするため。calc_stdev.update_mean_var()はそう想定。
             _, _, sigma_reward_accumulated = self._calc_stdev.update_mean_var(trajectory["reward"].squeeze())       
@@ -142,7 +146,7 @@ class PPOAgentTrainer():
 
             ##訓練成果記録のためのPlay　1エピソード　step数とscoreを記録する##
             
-            #訓練成果記録のためのPlayのenvは、訓練時の独自報酬設計のwrapperではなく、wrapされているオリジナルのenv
+            #訓練成果記録のためのPlayのenvは、訓練時の独自報酬設計のEnvWrapperサブクラスではなく、オリジナルのEnvWrapper
             env_wrapped = self._env.env
             
             done = False
@@ -203,6 +207,7 @@ class PPOAgentTrainer():
             
         result = {}
         result["name"] = self._name #このインスタンスの名前
+        result["description"] = self._description #このインスタンスの説明
         result["loss_actor_epochs"] = loss_actor_epochs #各エポックでのActorのlossのList。Listの1要素はエポック。
         result["loss_critic_epochs"] = loss_critic_epochs #各エポックでのCriticのlossのList。Listの1要素はエポック。
         result["steps_epochs"] = steps_epochs #各エポックでの1エピソード試行でのステップ数のList。Listの1要素はエポック。
@@ -247,14 +252,25 @@ class PPOAgentTrainer():
     def _train_actor(self, trajectory, gamma, batch_size, clip_range):
 
         xsize = trajectory["state"].shape[0]
+                
+        #以下は復元抽出
+        #しかし実験の結果、「非復元抽出時より確実に低い、ある一定のscoreで停滞」「成長途中で大崩れ」の2パターンになったので、不採用
+        #iter_num = np.ceil(xsize / batch_size).astype(np.int) * 3 #イテレーション数
+        #idx = np.random.choice( range(xsize), (iter_num, batch_size) )
+        
+        #以下は非復元抽出
+        iter_num = np.ceil(xsize / batch_size).astype(np.int) #イテレーション数
         idx = np.arange(xsize)
         np.random.shuffle(idx)
-        iter_num = np.ceil(xsize / batch_size).astype(np.int) #イテレーション数
-        
+                
         losses_ = []
 
         for it in range(iter_num):
             
+            #以下は復元抽出
+            #mask = idx[it]
+            
+            #以下は非復元抽出
             mask = idx[batch_size*it : batch_size*(it+1)]
             
             #ミニバッチの生成
@@ -275,15 +291,25 @@ class PPOAgentTrainer():
     def _train_critic(self, trajectory, batch_size):
 
         xsize = trajectory["state"].shape[0]
+                
+        #以下は復元抽出
+        #しかし実験の結果、「非復元抽出時より確実に低い、ある一定のscoreで停滞」「成長途中で大崩れ」の2パターンになったので、不採用
+        #iter_num = np.ceil(xsize / batch_size).astype(np.int) * 3 #イテレーション数
+        #idx = np.random.choice( range(xsize), (iter_num, batch_size) )
+        
+        #以下は非復元抽出
+        iter_num = np.ceil(xsize / batch_size).astype(np.int) #イテレーション数
         idx = np.arange(xsize)
         np.random.shuffle(idx)
-        iter_num = np.ceil(xsize / batch_size).astype(np.int) #イテレーション数
-        
+                
         losses_ = []
 
         for it in range(iter_num):
             
+            #以下は復元抽出
+            #mask = idx[it]
             
+            #以下は非復元抽出
             mask = idx[batch_size*it : batch_size*(it+1)]
             
             #ミニバッチの生成
@@ -310,10 +336,19 @@ class PPOAgentTrainer():
     @property
     def env(self):
         return self._env
-
+    
     @property
     def agent(self):
         return self._agent
+    
+    @property
+    def description(self):
+        return self._description
+    
+    @name.setter
+    def description(self, description):
+        self._description = description
+    
         
     class Calculater_Statistics:
         
