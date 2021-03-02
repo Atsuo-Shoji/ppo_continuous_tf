@@ -1,4 +1,4 @@
-# PPO（Proximal Policy Optimization）（TensorFlow2.3.0を使用）
+# ＜訂正中＞ PPO（Proximal Policy Optimization）（TensorFlow2.3.0を使用）
 
 
 ## 概要
@@ -24,7 +24,7 @@ PPO（Proximal Policy Optimization）をTensorflow2.3.0で実装しました。<
 
 <br>
     
-## 実装の要点
+##  ＜訂正中＞ 実装の要点
 
 ### 全体の構成
 
@@ -83,7 +83,7 @@ ActorのLossをclipするのに使用されるratioは、以下のように算�
 
 <br><br>
 
-## 結果
+##  ＜訂正中＞ 結果
 
 ### MountainCarContinuous
 
@@ -179,7 +179,7 @@ Agentが一体しかない場合は、経験データの”質”が訓練成果
 
 <br><br>
 
-## 物理構成
+##  ＜訂正中＞ 物理構成
 
 ※TensorFlowは2.3.0以上が必要です。tensorflow_probabilityを使用しています。
 

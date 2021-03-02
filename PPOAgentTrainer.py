@@ -22,15 +22,27 @@ class PPOAgentTrainer():
         self._action_dim = self._agent.action_dim
         
         self._description = description
+                       
+        #train後のオブジェクトインスタンスに対して追加でtrain()することがよくある。
+        #その際、best_scoreを引き継がないで毎回best_scoreを-np.infで初期化してしまうと、
+        #せっかく1回目のtrainで良いscoreを出してその時のパラメーターを正式採用しても、
+        #2回目のtrainの1エポック目でbest_score判定され、問答無用にその1エポック目の更新後パラメーターを一時退避してしまう。
+        #つまり1回目の良いパラメーターは捨てられてしまう。
+        #それを避けるためには、best_scoreを引き継ぐ必要がある。
+        self._best_score = -np.inf #train()中のNN更新後の1エピソードPlayでの稼得score　それまでのbest_score
+        self._best_score_count = 0 #train()中のNN更新後の1エピソードPlayでの稼得score　best_score更新回数        
+        #現時点での訓練対象パラメーターを一時退避　train()にてbest_score達成によるパラメーター一時退避が起こらないこともありうる
+        self._agent.keep_temporarily_learnable_params()
         
         #報酬の蓄積
         #Reward Scalingのための全報酬の標準偏差の算出に使用
         #経験バッファと異なり、エポックで洗い替えない（train開始時点から蓄積し続ける）
-        #train()を連続して呼ばれることを考慮し、メンバ変数とする
-        self._calc_stdev = PPOAgentTrainer.Calculater_Statistics.createInstance()
+        #上記best_score関連同様、train()を連続して呼ばれることを考慮し、メンバ変数とする
+        self._calc_stdev = Calculater_Statistics.createInstance()
+        
         
     def train(self, epochs, trajectory_size=1024, lamda_GAE=0.95, gamma=0.99, batch_size=1024, clip_range=0.2, 
-              verbose_interval=1):
+              loss_actor_entropy_coef=0, verbose_interval=1):
         
         #epochs：何エポック訓練するか
         #trajectory_size：経験データのサイズ
@@ -47,18 +59,10 @@ class PPOAgentTrainer():
         loss_critic_epochs = [] #Criticのlossのエポック毎の記録　正確には、そのエポックでのNN更新前のloss
         steps_epochs = [] #NN更新後の1エピソードPlayでのステップ数のエポック毎の記録
         score_epochs = [] #NN更新後の1エピソードPlayでの稼得score（報酬合計）のエポック毎の記録
-        best_score = -np.inf #NN更新後の1エピソードPlayでの稼得score　今までのエポックの中のベストscore
-        best_score_count = 0 #NN更新後の1エピソードPlayでの稼得score　ベストscore更新回数
-        
-        #現時点での訓練対象パラメーターを一時退避　ベストscore達成によるパラメーター一時退避が起こらないこともありうる
-        self._agent.keep_temporarily_learnable_params()
-        
+                
         #env初期化
         st = self._env.reset()
-        #エピソード終端（done=True）で、next_stが無い（None）時のダミー
-        #delta計算時にNoneだと計算不可になるので（あまり良くないが他にいい方法が思いつかない）
-        next_st_zero_for_none = np.zeros_like(st, dtype=np.float32)
-
+        
         for epc in range(epochs):
             
             #1エポック
@@ -83,7 +87,9 @@ class PPOAgentTrainer():
                 next_st, rew, done, _  = self._env.step(a)
                 
                 if done==True:
-                    next_st = next_st_zero_for_none
+                    next_st = self._env.reset()
+                    #エピソード終端時、trajectory["next_state"]に入るのは、時系列的に継続性のない、State初期値となる。
+                    #後のdelta計算時、エピソード最終ステップに対応するV(St+1)は（算出はされるが）使用されないので、↑で構わない。
                 
                 #経験バッファに追加
                 trajectory["state"].append(st)
@@ -97,10 +103,7 @@ class PPOAgentTrainer():
                 #報酬の蓄積
                 #reward_accumulated.append(rew)
 
-                if done==True:
-                    st = self._env.reset()
-                else:
-                    st = next_st
+                st = next_st
 
             #経験バッファ内の各列はListであるが、これだと列単位の演算に不向きなので、ndarrayに置換
             #reshapeは、統一的に配列のaxis=0をデータ数trajectory_sizeにするため。
@@ -138,7 +141,7 @@ class PPOAgentTrainer():
             
             ##Actorの訓練##
 
-            loss_actor = self._train_actor(trajectory, gamma, batch_size, clip_range)
+            loss_actor = self._train_actor(trajectory, gamma, batch_size, clip_range, loss_actor_entropy_coef)
             
             ##Criticの訓練##
 
@@ -167,10 +170,10 @@ class PPOAgentTrainer():
                 
                 st = next_st 
                 
-            if total_reward>=best_score:
+            if total_reward>=self._best_score:
                 #scoreで成績を計測
-                best_score = total_reward
-                best_score_count += 1
+                self._best_score = total_reward
+                self._best_score_count += 1
                 save_temp_params = True
                 
             if save_temp_params==True:
@@ -185,7 +188,7 @@ class PPOAgentTrainer():
 
             if verbose_interval>0 and ( (epc+1)%verbose_interval==0 or epc==0 or (epc+1)==epochs ):
                 summary_epc = "Epoch:" + str(epc) + " score:" + str(total_reward) + " steps:" + str(total_steps) + " loss_actor:" + str(loss_actor) + " loss_critic:" + str(loss_critic)
-                summary_epc = summary_epc + " best score:" + str(best_score) + "(" + str(best_score_count) + "回)"
+                summary_epc = summary_epc + " best score:" + str(self._best_score) + "(" + str(self._best_score_count) + "回)"
                 if save_temp_params==True:
                     summary_epc = summary_epc + " パラメーター一時退避"
                 time_string = datetime.now().strftime('%H:%M:%S')
@@ -212,7 +215,7 @@ class PPOAgentTrainer():
         result["loss_critic_epochs"] = loss_critic_epochs #各エポックでのCriticのlossのList。Listの1要素はエポック。
         result["steps_epochs"] = steps_epochs #各エポックでの1エピソード試行でのステップ数のList。Listの1要素はエポック。
         result["score_epochs"] = score_epochs #各エポックでの1エピソード試行での稼得ScoreのList。Listの1要素はエポック。
-        result["best_score"] = best_score #全エポックでのエピソード試行でのBest Score。
+        result["best_score"] = self._best_score #全エポックでのエピソード試行でのBest Score。
         result["processing_time_total_string"] = processing_time_total_string #総処理時間の文字列表現。
         result["processing_time_total"] = processing_time_total #総処理時間。
         #以下引数
@@ -222,6 +225,7 @@ class PPOAgentTrainer():
         result["gamma"] = gamma
         result["batch_size"] = batch_size
         result["clip_range"] = clip_range
+        result["loss_actor_entropy_coef"] = loss_actor_entropy_coef
         
         return result
 
@@ -249,7 +253,7 @@ class PPOAgentTrainer():
 
         return gaes.reshape(-1, 1), Vtargs.reshape(-1, 1)
     
-    def _train_actor(self, trajectory, gamma, batch_size, clip_range):
+    def _train_actor(self, trajectory, gamma, batch_size, clip_range, loss_actor_entropy_coef):
 
         xsize = trajectory["state"].shape[0]
                 
@@ -280,7 +284,7 @@ class PPOAgentTrainer():
             policies_ = tf.convert_to_tensor(trajectory["policy"][mask])
 
             #ミニバッチをActorに渡して訓練 train_on_batch
-            loss_ = self._agent.actor.train(states_, actions_, gaes_, policies_, clip_range)
+            loss_ = self._agent.actor.train(states_, actions_, gaes_, policies_, clip_range, loss_actor_entropy_coef)
             
             losses_.append(loss_)
 
@@ -347,92 +351,4 @@ class PPOAgentTrainer():
     
     @name.setter
     def description(self, description):
-        self._description = description
-    
-        
-    class Calculater_Statistics:
-        
-        #ある分布の平均と分散を逐次計算
-        #対象統計データ量が多くなる場合に使用（多くなければ本クラスを使用せず、例えば標準偏差ならnp.stdでよい）
-        #よって、対象統計データそのものを保持せず、その平均と分散のみを保持する。
-        #追加データを加味した平均と分散を追加都度計算し直し、それらを返す。
-        
-        id_instance = 0
-        
-        def __init__(self, id, shape=None, dtype=np.float32, description=""):
-            
-            self._mean_curr = np.zeros(shape, dtype) #現時点での対象統計データの平均
-            self._var_curr = np.zeros(shape, dtype) #現時点での対象統計データの分散
-            self._count_curr = 0 #現時点での対象統計データの件数
-            
-            self._shape = shape
-            self._dtype = dtype
-            
-            self._id = id #インスタンスが複数作成される場合の区別に使用          
-            self._description = description #このインスタンスの使用目的に使用　「to calculate the stdev of the accumulated rewards」など
-        
-        @classmethod
-        def createInstance(cls, shape=None, dtype=np.float32, description=""):
-            
-            id_ins = cls.id_instance
-            ins = cls(id_ins, shape, dtype, description)  
-            
-            cls.id_instance += 1
-            
-            return ins
-        
-        def update_mean_var(self, X_added):
-            
-            #X_added：追加するデータ　　shapeは(追加データ数, shape)
-            #ただし、shapeがNoneや()の場合、shapeは(追加データ数, )
-            #　使用される場面は、train()中あるエポックでのtrajectory収集後の蓄積rewardの標準偏差算出
-            #　X_addedは、そのエポックでの全stepのrewardsのndarray　shapeは(このエポックでのstep数, 1)
-            
-            mean_added = np.mean(X_added, axis=0)
-            var_added = np.var(X_added, axis=0)
-            count_added = X_added.shape[0]
-            
-            mean_delta = mean_added - self._mean_curr
-            var_added_multiplied_count = var_added * count_added
-            var_curr_multiplied_count = self._var_curr * self._count_curr
-            
-            count_new = self._count_curr + count_added
-            mean_new =self._mean_curr + ( mean_delta * count_added / count_new )            
-            var_new = (  var_curr_multiplied_count + var_added_multiplied_count \
-                      + ( np.square(mean_delta) * self._count_curr * count_added / count_new )  ) \
-                      / count_new
-            
-            self._mean_curr = mean_new
-            self._var_curr = var_new
-            self._count_curr = count_new
-            
-            return mean_new, var_new, np.sqrt(var_new)                         
-            
-        
-        @property
-        def id(self):
-            return self._id
-        
-        @property
-        def shape(self):
-            return self._shape
-        
-        @property
-        def dtype(self):
-            return self._dtype
-        
-        @property
-        def description(self):
-            return self._description
-        
-        @property
-        def curr_mean(self):
-            return self._mean_curr
-        
-        @property
-        def curr_var(self):
-            return self._curr_var
-        
-        @property
-        def curr_stdev(self):
-            return np.sqrt(self._curr_var)
+        self._description = description    

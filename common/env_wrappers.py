@@ -29,8 +29,8 @@ class EnvWrapper_plain(gym.Wrapper):
 
 class EnvWrapper_01(gym.Wrapper):
     """
-    エピソード修了時の報酬
-     エピソード上限ステップ数まで到達したら報酬X, 到達しなければ報酬-Y
+    エピソード終了時の報酬
+     エピソード上限ステップ数まで到達したら報酬X, 到達しなければ報酬Y
      ステップごとの報酬はオリジナルのenvの報酬
     を返す
     """

@@ -244,7 +244,7 @@ class Agent():
             return best_action, prob
 
         @tf.function
-        def train(self, states, actions, gaes, base_policies, clip_range):
+        def train(self, states, actions, gaes, base_policies, clip_range, loss_actor_entropy_coef):
             #Actorの訓練関数
             #引数の訓練データはミニバッチ
             #tf仕様上は必須ではないが、引数の訓練データはtensorにして呼ぶこと
@@ -253,41 +253,72 @@ class Agent():
             #print("actions.shape:", actions.shape) #(batch_size, action_dim)
             #print("gaes.shape:", gaes.shape) #(batch_size, 1)
             #print("base_policies.shape:", base_policies.shape) #(batch_size, action_dim)
+            
+            #経験データbase_policiesは、経験データactionsのもとになった正規分布の確率密度関数の関数値（縦軸）で、
+            #actionsと同じくaction_dim毎、つまりshapeは(batch_size, action_dim)
+            #logを取って、全action_dimで合計
+            log_base_policies = tf.math.log(base_policies + 1e-8)
+            log_base_policies_sum = tf.reduce_sum(log_base_policies, axis=1, keepdims=True)
+            #(batch_size, 1)
 
             with tf.GradientTape() as tape:
-
+                
+                #Actorの順伝播
+                #正規分布の平均と標準偏差を出力させる
                 curr_mus, curr_sigmas = self(states)
-                #(batch_size, action_dim)
-                #(batch_size, action_dim)
+                #双方、(batch_size, action_dim)
 
+                #Actorの順伝播で得られた平均と標準偏差をもとに、正規分布の確率密度関数を生成
                 pdfs_normal = tfd.Normal(loc=curr_mus, scale=curr_sigmas)
                 
+                #経験データactions（横軸）に対応する確率密度関数値（縦軸）を算出
                 curr_policies = pdfs_normal.prob(actions)
                 #(batch_size, action_dim)
-
-                ratios = curr_policies / (base_policies + 1e-8)
-                #(batch_size, action_dim)
                 
+                #logを取って、全action_dimで合計
+                log_curr_policies = tf.math.log(curr_policies + 1e-8)
+                log_curr_policies_sum = tf.reduce_sum(log_curr_policies, axis=1, keepdims=True)
+                #(batch_size, 1)
+                
+                #ratiosは、NNパラメーター更新幅の抑制に使用される。
+                #よって、action_dim毎に持たない。
+                #そのために、log_curr_policiesとlog_base_policiesをaxis=1でsumし、各々を(batch_size, 1)にした。
+                #ratios = curr_policiesをaxis=1でsumしたもの) / base_policiesをaxis=1でsumしたもの
+                ratios = tf.math.exp(log_curr_policies_sum - log_base_policies_sum)
+                #(batch_size, 1)
+                
+                #clipしたratio
                 ratios_clipped = tf.clip_by_value(ratios, 1-clip_range, 1+clip_range)
-                #(batch_size, action_dim)
+                #(batch_size, 1)
 
-                losses_unclipped = ratios * gaes
-                #(batch_size, action_dim)
+                #clipしない目的関数値
+                values_obj_func_unclipped = ratios * gaes
+                #(batch_size, 1)
 
-                losses_clipped = ratios_clipped * gaes
-                #(batch_size, action_dim)
+                #clipした目的関数値
+                values_obj_func_clipped = ratios_clipped * gaes
+                #(batch_size, 1)
 
-                losses = tf.minimum(losses_unclipped, losses_clipped)
-                #(batch_size, action_dim)
+                #目的関数値　上記両者の大きくない方
+                values_obj_func = tf.minimum(values_obj_func_unclipped, values_obj_func_clipped)
+                #(batch_size, 1)
                 
-                #以下のエントロピー補正はむしろ悪化したので無効に
+                #最小化すべき損失関数値　目的関数値をただマイナスする
+                losses = -1 * values_obj_func
+                #(batch_size, 1)
                 
-                #entropy = tf.reduce_sum( curr_policies * tf.math.log(curr_policies + 1e-8), axis=1 )
-                #shapeは(batch_size, )のはず
+                #損失関数値のエントロピー補正項
+                if loss_actor_entropy_coef>0:
+                    entropies_curr_policies = tf.reduce_sum(-1 * curr_policies * log_curr_policies, axis=1, keepdims=True)
+                    #(batch_size, 1)
+                    #curr_policiesの分布が”確定的”なほどentropyは小さい　→　しかし損失関数値は増やしたい（損失関数値の減少幅を小さく）
+                    #curr_policiesの分布が”あいまい”なほどentropyは大きい　→　しかし損失関数値は減らしたい（損失関数値の減少幅を大きく）
+                    #⇒本来の損失関数値からeentropyをマイナスする
+                    #curr_policiesの分布が”確定的”なほどentropyは小さい　→　損失関数値の減少幅は小さくなる
+                    #curr_policiesの分布が”あいまい”なほどentropyは大きい　→　損失関数値は減少幅は大きくなる
+                    losses = losses - loss_actor_entropy_coef * entropies_curr_policies
                 
-                #l_entropy = tf.reduce_mean(entropy)
-                
-                loss = -1 * tf.reduce_mean(losses) #- 0.01 * l_entropy
+                loss = tf.reduce_mean(losses)
 
             grads = tape.gradient(loss, self.trainable_variables)
             
