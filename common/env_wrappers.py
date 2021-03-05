@@ -18,13 +18,19 @@ class EnvWrapper_plain(gym.Wrapper):
         self.steps = 0
         
         return obs
-
+    
     def step(self, action):
         
+        obs, rew_, done, info, _ = self.step_ex(action)
+        
+        return obs, rew_, done, info
+
+    def step_ex(self, action):
+                
         self.steps += 1
         obs, rew, done, info = self.env.step(action)
             
-        return obs, rew, done, info
+        return obs, rew, done, info, rew
     
 
 class EnvWrapper_01(gym.Wrapper):
@@ -51,8 +57,14 @@ class EnvWrapper_01(gym.Wrapper):
         self.steps = 0
         
         return obs
-
+    
     def step(self, action):
+        
+        obs, rew_, done, info, _ = self.step_ex(action)
+        
+        return obs, rew_, done, info
+
+    def step_ex(self, action):
         
         self.steps += 1
         obs, rew, done, info = self.env.step(action)
@@ -69,7 +81,7 @@ class EnvWrapper_01(gym.Wrapper):
         else:
             rew_ = rew
             
-        return obs, rew_, done, info
+        return obs, rew_, done, info, rew
     
     
 class EnvWrapper_02(gym.Wrapper):
@@ -93,8 +105,14 @@ class EnvWrapper_02(gym.Wrapper):
         self.steps = 0
         
         return obs
-
+    
     def step(self, action):
+        
+        obs, rew_, done, info, _ = self.step_ex(action)
+        
+        return obs, rew_, done, info
+
+    def step_ex(self, action):
         
         self.steps += 1
         obs, rew, done, info = self.env.step(action)
@@ -104,7 +122,7 @@ class EnvWrapper_02(gym.Wrapper):
         else:
             rew_ = rew
             
-        return obs, rew_, done, info
+        return obs, rew_, done, info, rew
     
 class EnvWrapper_03(gym.Wrapper):
     """
@@ -127,8 +145,14 @@ class EnvWrapper_03(gym.Wrapper):
         self.steps = 0
         
         return obs
-
+    
     def step(self, action):
+        
+        obs, rew_, done, info, _ = self.step_ex(action)
+        
+        return obs, rew_, done, info
+
+    def step_ex(self, action):
         
         self.steps += 1
         obs, rew, done, info = self.env.step(action)
@@ -138,7 +162,7 @@ class EnvWrapper_03(gym.Wrapper):
         else:
             rew_ = rew
             
-        return obs, rew_, done, info
+        return obs, rew_, done, info, rew
     
 class EnvWrapper_04(gym.Wrapper):
     """
@@ -159,12 +183,18 @@ class EnvWrapper_04(gym.Wrapper):
         self.steps = 0
         
         return obs
-
+    
     def step(self, action):
+        
+        obs, rew_, done, info, _ = self.step_ex(action)
+        
+        return obs, rew_, done, info
+
+    def step_ex(self, action):
         
         self.steps += 1
         obs, rew, done, info = self.env.step(action)
         
         rew_ = rew * self._reward_scale
             
-        return obs, rew_, done, info
+        return obs, rew_, done, info, rew
