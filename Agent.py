@@ -62,10 +62,10 @@ class Agent():
         #の2つ（以上）のlearnable_paramsファイルの中身をload
         
         #注意！！この機能では、「訓練の継続」はできない。訓練済モデルによる「推論」のみである。
-        #訓練途中の累積報酬の平均と分散を保持・計算するPPOAgentTrainer.Calculater_Statisticsは、GAEを計算するために必須のものである。
+        #訓練途中の累積報酬の平均と分散を保持・計算するCalculater_Statisticsは、GAEを計算するために必須のものである。
         #だがそれは1個上の階層のTrainerが保持しているので、このAgentでは保存できずしていない。
         #なのでこのreadで復活するパラメーターは訓練にとっては不完全。
-        #PPOAgentTrainer.Calculater_Statisticsは、推論時には使用しないので、推論は問題なく可能。
+        #Calculater_Statisticsは、推論時には使用しないので、推論は問題なく可能。
         
         path_actor = os.path.join(files_dir, common_file_name + "_actor")
         path_critic = os.path.join(files_dir, common_file_name + "_critic")
