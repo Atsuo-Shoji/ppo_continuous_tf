@@ -61,7 +61,7 @@ Critic側は、単純に状態価値関数値を出力するだけです。<br>
 
 これを複数エポック繰り返します。
 
-![訓練処理の時間軸_70](https://user-images.githubusercontent.com/52105933/110056276-dadc2800-7da1-11eb-99da-50b54fb14aef.png)
+![訓練処理の時間軸_70](https://user-images.githubusercontent.com/52105933/110188042-be9dc100-7e5d-11eb-9fe9-613a1378ea9b.png)
 
 #### 報酬設計の変更　～ gym.Wrapperのサブクラス
 
