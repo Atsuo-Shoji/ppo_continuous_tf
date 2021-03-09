@@ -316,6 +316,10 @@ class Agent():
                     #⇒本来の損失関数値からeentropyをマイナスする
                     #curr_policiesの分布が”確定的”なほどentropyは小さい　→　損失関数値の減少幅は小さくなる
                     #curr_policiesの分布が”あいまい”なほどentropyは大きい　→　損失関数値は減少幅は大きくなる
+                    #注意！　-1 * curr_policies_sum * log_curr_policies_sum　としないように。数学的に等しくない。
+                    #K=2として書いてみればわかる。
+                    #正しい方(マイナスは省く)　： p1*logp1 + p2*logp2
+                    #間違いの方（マイナスは省く）　：　(p1+p2) * log(p1+p2) = p1*log(p1+p2) + p2*log(p1+p2)　となり、↑と異なる。
                     losses = losses - loss_actor_entropy_coef * entropies_curr_policies
                 
                 loss = tf.reduce_mean(losses)
