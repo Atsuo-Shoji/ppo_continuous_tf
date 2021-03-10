@@ -5,6 +5,7 @@ results/
 common/__pycache__/
 GitHub/
 保管庫/
+実験記録/
 play_imgs/
 frames/
 ppo_tf_dev*
