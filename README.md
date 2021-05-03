@@ -29,7 +29,7 @@ PPO（Proximal Policy Optimization）をTensorflow2.3.0で実装しました。<
 
 | 未訓練モデルでPlay<br>すぐ転倒し前に進めない | | PPO訓練済モデルでPlay<br>2足歩行してある程度のところまで前進 |
 |      :---:       |     :---:      |     :---:      |
-|![BipedalWalker_beginner_66s](https://user-images.githubusercontent.com/52105933/95009942-9c123c80-0660-11eb-9cb1-b5ee0a2a90f7.gif)|![矢印（赤）](https://user-images.githubusercontent.com/52105933/110228721-b0779f80-7f46-11eb-8cd9-469501beea50.png)|![bipwalker_ver20_wrap01_pos1_neg1_10it_entcof01_202103030756_st717_r191](https://user-images.githubusercontent.com/52105933/113482775-2128c200-94db-11eb-8e44-d4b711a915b8.gif)|
+|![BipedalWalker_beginner_66s](https://user-images.githubusercontent.com/52105933/95009942-9c123c80-0660-11eb-9cb1-b5ee0a2a90f7.gif)|![矢印（赤）](https://user-images.githubusercontent.com/52105933/110228721-b0779f80-7f46-11eb-8cd9-469501beea50.png)|![bipwalker_wrap01_10it_entcof01_genGAE_202105021252_5_st955_r288](https://user-images.githubusercontent.com/52105933/116878966-0329bb00-ac5b-11eb-981c-c413c38467ba.gif)|
 
 <br><br>
 
@@ -163,12 +163,7 @@ Actor（Policy側）のLossにおいて、以下のように、現在の方策�
 |GAE算出での報酬の割引率γ|0.99|
 |方策エントロピー項の係数c|**0.1**|
 
-#### 訓練成果の動画
-
-（500エポック終了時点のもの）<BR>
-![bipwalker_ver20_wrap01_pos1_neg1_10it_entcof01_202103030756_st717_r191](https://user-images.githubusercontent.com/52105933/113482775-2128c200-94db-11eb-8e44-d4b711a915b8.gif)
-
-#### 各エポックでの訓練成果の評価グラフ
+#### 各エポックでの訓練成果の評価グラフ（500エポックまで）
 
 ![epoch推移グラフ群_80_W](https://user-images.githubusercontent.com/52105933/110111228-574b2700-7df3-11eb-8497-d517170b278f.png)
 
