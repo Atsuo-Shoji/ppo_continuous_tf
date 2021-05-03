@@ -27,7 +27,7 @@ PPO（Proximal Policy Optimization）をTensorflow2.3.0で実装しました。<
 
 #### 未訓練モデル/訓練済モデルでplayした結果の比較
 
-| 未訓練モデルでPlay<br>すぐ転倒し前に進めない | | PPO訓練済モデルでPlay<br>2足歩行してある程度のところまで前進 |
+| 未訓練モデルでPlay<br>すぐ転倒し前に進めない | | PPO訓練済モデルでPlay<br>2足歩行してゴールに到達 |
 |      :---:       |     :---:      |     :---:      |
 |![BipedalWalker_beginner_66s](https://user-images.githubusercontent.com/52105933/95009942-9c123c80-0660-11eb-9cb1-b5ee0a2a90f7.gif)|![矢印（赤）](https://user-images.githubusercontent.com/52105933/110228721-b0779f80-7f46-11eb-8cd9-469501beea50.png)|![bipwalker_wrap01_10it_entcof01_genGAE_202105021252_5_st955_r288](https://user-images.githubusercontent.com/52105933/116878966-0329bb00-ac5b-11eb-981c-c413c38467ba.gif)|
 
