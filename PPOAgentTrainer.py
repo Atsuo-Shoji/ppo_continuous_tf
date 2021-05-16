@@ -14,7 +14,7 @@ class PPOAgentTrainer():
     
     def __init__(self, name, env, agent, description=""):
         
-        self._VERSION = 2.0        
+        self._VERSION = 2.1      
         
         self._name = name
         self._env = env
@@ -26,13 +26,13 @@ class PPOAgentTrainer():
         self._description = description
                        
         #train後のオブジェクトインスタンスに対して追加でtrain()することがよくある。
-        #その際、max_total_rewを引き継がないで毎回max_total_rewを-np.infで初期化してしまうと、
-        #せっかく1回目のtrainで良いtotal_rewを出してその時のパラメーターを正式採用しても、
-        #2回目のtrainの1エポック目でmax_total_rew判定され、問答無用にその1エポック目の更新後パラメーターを一時退避してしまう。
+        #その際、max_emetを引き継がないで毎回max_emetを-np.infで初期化してしまうと、
+        #せっかく1回目のtrainで良いtemetを出してその時のパラメーターを正式採用しても、
+        #2回目のtrainの1エポック目でmax_emet判定され、問答無用にその1エポック目の更新後パラメーターを一時退避してしまう。
         #つまり1回目の良いパラメーターは捨てられてしまう。
-        #それを避けるためには、max_total_rewを引き継ぐ必要がある。
-        self._max_total_rew = -np.inf #train()中の稼得即時報酬合計のそれまでの最大値
-        self._max_total_rew_count = 0 #train()中の稼得即時報酬合計のそれまでの最大値　更新回数        
+        #それを避けるためには、max_emetを引き継ぐ必要がある。
+        self._max_emet = -np.inf #train()中の訓練成果（epoch_metrics）のそれまでの最大値
+        self._max_emet_count = 0 #train()中の訓練成果emetのそれまでの最大値　更新回数        
         #現時点での訓練対象パラメーターを一時退避　train()にてmax_total_rew達成によるパラメーター一時退避が起こらないこともありうる
         self._agent.keep_temporarily_learnable_params()
         
@@ -40,11 +40,13 @@ class PPOAgentTrainer():
         #即時報酬標準化のための全報酬の標準偏差の算出に使用
         #経験バッファと異なり、エポックで洗い替えない（train開始時点から蓄積し続ける）
         #上記max_total_rew関連同様、train()を連続して呼ばれることを考慮し、メンバ変数とする
-        self._calc_stdev = Calculater_Statistics.createInstance()
+        self._calc_stdev_reward = Calculater_Statistics.createInstance()
+        
+        self._calc_stdev_gae = Calculater_Statistics.createInstance()
         
         
     def train(self, epochs, trajectory_size=1024, lamda_GAE=0.95, gamma=0.99, batch_size=1024, clip_range=0.2, 
-              loss_actor_entropy_coef=0, verbose_interval=1):
+              loss_actor_entropy_coef=0, standardize_GAE=True, epoch_metrics=1, verbose_interval=1):
         
         #epochs：何エポック訓練するか
         #trajectory_size：経験データのサイズ
@@ -52,7 +54,12 @@ class PPOAgentTrainer():
         #gamma：報酬の割引率γ
         #batch_size：1イテレーションのミニバッチサイズ
         #clip_range：ratio算出の際に使用するclipの範囲のε
-        #loss_actor_entropy_coef：actor（policy側）のlossにpolicyのentropyを適用する係数（０以上）
+        #loss_actor_entropy_coef：actor（policy側）のlossにpolicyのentropyを適用する係数（0以上）
+        #standardize_GAE：標準化したGAEをcritic（value側）の教師信号に使用するか
+        #epoch_metrics：エポック毎の訓練成果指標。これをもとにパラメーターの一時退避を判断。
+        #　1：エポックの報酬合計
+        #　2：エポックの報酬エピソード平均
+        #　3：エポックの報酬エピソード平均 x エポックのステップ数エピソード平均
         #verbose_interval：何エポック毎に訓練記録をprint出力するか
         
         start_time = datetime.now()
@@ -60,6 +67,7 @@ class PPOAgentTrainer():
         #訓練結果の記録　エポック毎の記録
         loss_actor_epochs = [] #Actorのlossのエポック毎の記録　正確には、そのエポックでのNN更新時の各イテレーションでの順伝播lossのイテレーション平均
         loss_critic_epochs = [] #Criticのlossのエポック毎の記録　正確には、そのエポックでのNN更新時の各イテレーションでの順伝播lossのイテレーション平均
+        epoch_metrics_epochs = [] #訓練成果のエポック毎の記録
         total_reward_epochs = [] #経験データ収集時の即時報酬合計のエポック毎の記録
         total_reward_orig_epochs = [] #経験データ収集時の即時報酬（オリジナル）合計のエポック毎の記録（訓練成果報告用）
         avg_steps_epochs = [] #経験データ収集時のステップ数エピソード平均のエポック毎の記録
@@ -78,6 +86,8 @@ class PPOAgentTrainer():
         trajectory = None
         
         for epc in range(epochs):
+            
+            #print("epc:", epc)
             
             #1エポック
             #（初回エポックのみ）経験データ（trajectory）収集
@@ -104,14 +114,32 @@ class PPOAgentTrainer():
             #ただし平均は引かない。
             #sigma_reward_accumulated = np.std(reward_accumulated_arr)
             #↓squeeze()は、この時点でのshape(trajectory_size, 1)⇒(trajectory_size,)にするため。calc_stdev.update_mean_var()はそう想定。
-            _, _, sigma_reward_accumulated = self._calc_stdev.update_mean_var(trajectory["reward"].squeeze())       
+            _, _, sigma_reward_accumulated = self._calc_stdev_reward.update_mean_var(trajectory["reward"].squeeze())
+            #print(" sigma_reward_accumulated:", sigma_reward_accumulated)
+            #print(" sigma_reward:", np.std(trajectory["reward"].squeeze()))
+            
+            #V(st)とV(st+1)をCriticに出力させる            
+            V = self._agent.critic.predict_V(trajectory["state"])
+            next_V = self._agent.critic.predict_V(trajectory["next_state"])
             
             #GAEの計算本体
-            #同時にCriticの教師信号も計算
-            gae, Vtarg = self._calculate_GAE_and_Vtarg(trajectory, sigma_reward_accumulated, lamda_GAE, gamma)
+            gae = self._calculate_GAE(trajectory, sigma_reward_accumulated, lamda_GAE, gamma, V, next_V)
             #以下、gaeとVtagはndarrayであることに注意　shapeは(trajectory_size, 1)のはず
-            trajectory["GAE"] = gae
-            trajectory["Vtarg"] = Vtarg
+            
+            if standardize_GAE==True:
+                #GAEの標準偏差を求め、GAEを標準化
+                _, _, sigma_gae_accumulated = self._calc_stdev_gae.update_mean_var(gae.squeeze()) 
+                #print(" sigma_gae_accumulated:", sigma_gae_accumulated)
+                #print(" sigma_gae:", np.std(gae.squeeze()))
+                gae_scaled = gae / sigma_gae_accumulated            
+                trajectory["GAE"] = gae_scaled.reshape(-1, 1)
+                gae = gae_scaled
+                        
+            ##Criticの教師信号計算##
+            
+            #教師信号 = Advantage + 出力値V
+            Vtarg = gae + V                        
+            trajectory["Vtarg"] = Vtarg.reshape(-1, 1)          
             
             ##Actorの訓練##
 
@@ -128,13 +156,14 @@ class PPOAgentTrainer():
             
             ##収集した経験データを評価、ステップ数、即時報酬、即時報酬（オリジナル）のエピソード平均など　必要ならば訓練対象パラメーターを一時退避##
             
-            #即時報酬の合計、即時報酬やステップ数のエピソード平均の算出
-            total_rew, total_rew_orig, avg_steps, avg_rew, avg_rew_orig = self._calc_total_avg_trajectory(episode_count, trajectory)
+            #このエポックの訓練成果、即時報酬の合計、即時報酬やステップ数のエピソード平均の算出
+            emet, total_rew, total_rew_orig, avg_steps, avg_rew, avg_rew_orig = self._calc_epoch_outcome(episode_count, 
+                                                                                                   trajectory, epoch_metrics)
             
-            #metricsである即時報酬の合計total_rewが、その今までの最大値以上なら、現時点でのパラメーターを一時退避
-            if total_rew>=self._max_total_rew:
-                self._max_total_rew = total_rew
-                self._max_total_rew_count += 1
+            #emetが、その今までの最大値以上なら、現時点でのパラメーターを一時退避
+            if emet>=self._max_emet:
+                self._max_emet = emet
+                self._max_emet_count += 1
                 #訓練対象パラメーターを一時退避
                 save_temp_params = True
                 self._agent.keep_temporarily_learnable_params()
@@ -143,7 +172,8 @@ class PPOAgentTrainer():
             
             #このエポックでのlossや訓練成果の記録
             loss_actor_epochs.append(loss_actor)
-            loss_critic_epochs.append(loss_critic)            
+            loss_critic_epochs.append(loss_critic) 
+            epoch_metrics_epochs.append(emet)
             total_reward_epochs.append(total_rew)
             total_reward_orig_epochs.append(total_rew_orig)
             avg_steps_epochs.append(avg_steps)
@@ -152,9 +182,9 @@ class PPOAgentTrainer():
             
             #画面表示のための文字列生成
             if verbose_interval>0 and ( (epc+1)%verbose_interval==0 or epc==0 or (epc+1)==epochs ):
-                summary_epc = "Epoch:" + str(epc) + " total_rew:" + str(round(total_rew, 2))
+                summary_epc = "Epoch:" + str(epc) + " epc_metrics:" + str(round(emet))
                 summary_epc = summary_epc + " Avg[rew:" + str(round(avg_rew)) + " step:" + str(round(avg_steps))  + "] loss_actor:" + str(round(loss_actor, 2)) + " loss_critic:" + str(round(loss_critic, 2))
-                summary_epc = summary_epc + " max_total_rew:" + str(round(self._max_total_rew, 2)) + "(" + str(self._max_total_rew_count) + "回)"
+                summary_epc = summary_epc + " max_epc_metrics:" + str(round(self._max_emet)) + "(" + str(self._max_emet_count) + "回)"
                 if save_temp_params==True:
                     summary_epc = summary_epc + " params一時退避"
                 time_string = datetime.now().strftime('%H:%M:%S')
@@ -181,12 +211,13 @@ class PPOAgentTrainer():
         result["description"] = self._description #このインスタンスの説明
         result["loss_actor_epochs"] = loss_actor_epochs #各エポックでのActorのlossのList。Listの1要素はエポック。
         result["loss_critic_epochs"] = loss_critic_epochs #各エポックでのCriticのlossのList。Listの1要素はエポック。
-        result["total_reward_epochs"] = total_reward_epochs #各エポックでの即時報酬エピソード平均のList。Listの1要素はエポック。
-        result["total_reward_orig_epochs"] = total_reward_orig_epochs #各エポックでの即時報酬エピソード平均のList。Listの1要素はエポック。
+        result["epoch_metrics_epochs"] = epoch_metrics_epochs #各エポックでの訓練成果のList。Listの1要素はエポック。
+        result["total_reward_epochs"] = total_reward_epochs #各エポックでの即時報酬合計のList。Listの1要素はエポック。
+        result["total_reward_orig_epochs"] = total_reward_orig_epochs #各エポックでの即時報酬（オリジナル）合計のList。Listの1要素はエポック。
         result["avg_steps_epochs"] = avg_steps_epochs #各エポックでのステップ数エピソード平均のList。Listの1要素はエポック。
         result["avg_reward_epochs"] = avg_reward_epochs #各エポックでの即時報酬エピソード平均のList。Listの1要素はエポック。
         result["avg_reward_orig_epochs"] = avg_reward_orig_epochs #各エポックでの即時報酬（オリジナル）エピソード平均のList。Listの1要素はエポック。
-        result["max_total_reward"] = self._max_total_rew #各エポックでの即時報酬合計の最大値。
+        result["max_epoch_metrics"] = self._max_emet #各エポックでの訓練成果の最大値。
         result["processing_time_total_string"] = processing_time_total_string #総処理時間の文字列表現。
         result["processing_time_total"] = processing_time_total #総処理時間。
         #以下引数など
@@ -198,6 +229,7 @@ class PPOAgentTrainer():
         result["batch_size"] = batch_size
         result["clip_range"] = clip_range
         result["loss_actor_entropy_coef"] = loss_actor_entropy_coef
+        result["standardize_GAE"] = standardize_GAE
         
         return result
 
@@ -275,9 +307,10 @@ class PPOAgentTrainer():
         return trajectory, episode_num
     
 
-    def _calc_total_avg_trajectory(self, episode_count, trajectory):
+    def _calc_epoch_outcome(self, episode_count, trajectory, epoch_metrics):
         
         #以下を返す。
+        #epoch_metricsに従ったエポック成績
         #即時報酬、即時報酬（オリジナル）　それぞれの合計
         #即時報酬、即時報酬（オリジナル）、ステップ数　それぞれのエピソード平均
         
@@ -290,14 +323,20 @@ class PPOAgentTrainer():
         total_rew_orig = np.sum(trajectory["reward_orig"])
         avg_rew_orig = total_rew_orig / episode_count
         
-        return total_rew, total_rew_orig, avg_steps, avg_rew, avg_rew_orig
+        if epoch_metrics==1:
+            emet = total_rew
+        elif epoch_metrics==2:
+            emet = avg_rew
+        elif epoch_metrics==3:
+            emet = avg_rew * avg_steps
+        else:
+            raise ValueError("引数「epoch_metrics」が未定義の数値です。")
+        
+        return emet, total_rew, total_rew_orig, avg_steps, avg_rew, avg_rew_orig
         
 
-    def _calculate_GAE_and_Vtarg(self, trajectory, sigma_reward_accumulated, lamda_GAE, gamma):
+    def _calculate_GAE(self, trajectory, sigma_reward_accumulated, lamda_GAE, gamma, Vs, next_Vs):
 
-        Vs = self._agent.critic.predict_V(trajectory["state"])
-        next_Vs = self._agent.critic.predict_V(trajectory["next_state"])
-        
         rewards_scaled = trajectory["reward"] / (sigma_reward_accumulated + 1e-4)
         deltas = rewards_scaled + gamma * (1 - trajectory["done"]) * next_Vs - Vs
         
@@ -308,13 +347,10 @@ class PPOAgentTrainer():
         for i in reversed( range( len(deltas) ) ):
             gae = deltas[i] + gamma * lamda_GAE * (1 - trajectory["done"][i]) * gae
             gaes[i] = gae
+            #if i%256==0 or i==len(deltas)-1:
+            #    print(" i:" + str(i) + " gae:" + str(gae))
 
-        ##Criticの教師信号　計算##
-
-        #教師信号 = Advantage + 出力値V
-        Vtargs = gaes + Vs
-
-        return gaes.reshape(-1, 1), Vtargs.reshape(-1, 1)
+        return gaes.reshape(-1, 1)
     
     
     def _train_actor(self, trajectory, gamma, batch_size, clip_range, loss_actor_entropy_coef):
