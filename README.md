@@ -85,6 +85,8 @@ BipedalWalkerは、失敗時（転倒時）、-100というとても大きな絶
 |エピソード終端　成功時<BR>（ゴールに到達した）|+1|
 |エピソード終端　失敗時<BR>（ゴールに到達しなかった）|-1|
 
+※gym.Wrapperの自作サブクラスは、common/env_wrappers.pyにて定義されています。
+
 #### ratio（「rt(Θ)」）
 
 ActorのLossをclipするのに使用されるratioは、以下のように算出しています。
@@ -209,7 +211,7 @@ PPOAgentTrainer.py　・・・Trainer<BR>
 Agent.py　・・・Agent<BR>
 common/<br>
 &nbsp;└funcs.py　・・・ユーティリティ関数など<br>
-&nbsp;└env_wrappers.py　・・・gym.Wrapperの各種サブクラス<br>
+&nbsp;└env_wrappers.py　・・・gym.Wrapperの各種自作サブクラス（報酬設計の変更時に使用）<br>
 <br>
 
 ![物理構成_70](https://user-images.githubusercontent.com/52105933/100743622-e2490980-341f-11eb-98ce-c7c10d18d438.png)
